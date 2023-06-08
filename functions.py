@@ -97,7 +97,7 @@ def numerical_hessian(coordinates, func, diff=0.01):
         
         2) DIAGONALS
             To approximate the value on the DIAGONALS such as another example:
-            d''V      V(X1,Y1+DIFF,X2,Y2) - 2*V(X1,Y1,X2,Y2) + V(X1,Y1,X2+DIFF,Y2)
+            d''V      V(X1,Y1+DIFF,X2,Y2) - 2*V(X1,Y1,X2,Y2) + V(X1,Y1-DIFF,X2,Y2)
             -----  =  ------------------------------------------------------------
             dY1Y1                    DIFF^2
 
@@ -113,8 +113,7 @@ def numerical_hessian(coordinates, func, diff=0.01):
     '''
     natoms, ndims = coordinates.shape
     reference_potential = func(coordinates)
-    H = np.zeros(shape=(natoms*ndims,natoms*ndims))
-
+    
     perturb_one_up   = np.zeros(shape=(natoms*ndims))
     perturb_one_down = np.zeros(shape=(natoms*ndims))
     perturb_both_up  = np.zeros(shape=(natoms*ndims, natoms*ndims))
@@ -131,22 +130,40 @@ def numerical_hessian(coordinates, func, diff=0.01):
         perturb_one_up[column]   = func(coordinates + column_perturb)
         perturb_one_down[column] = func(coordinates - column_perturb)
 
-        H[column,column] = perturb_one_up[column] - 2*reference_potential + perturb_one_down[column]
-        H[column,column] = H[column,column]/(diff**2)
-
         for row in range(column):
             row_atom      = row//ndims
             row_dimension = row%ndims
             
             row_perturb[row_atom,row_dimension] = diff
-            perturb_both_up[row,column]   = func(coordinates + column_perturb + row_perturb)
-            perturb_both_down[row,column] = func(coordinates - column_perturb - row_perturb)
+            perturb_both_up[row,column]   = perturb_both_up[column,row]   = func(coordinates + column_perturb + row_perturb)
+            perturb_both_down[row,column] = perturb_both_down[column,row] = func(coordinates - column_perturb - row_perturb)
             row_perturb[row_atom,row_dimension] = 0
-
-            numerator =  perturb_both_up[row,column] + perturb_both_down[row,column] + 2*reference_potential
-            numerator -= perturb_one_up[column] + perturb_one_up[row] + perturb_one_down[column] + perturb_one_down[row]
-            H[column,row] = H[row,column] = numerator/(2*diff**2)
 
         column_perturb[column_atom,column_dimension] = 0
 
-    return H
+    vH =  perturb_both_up+perturb_both_down+2*reference_potential
+    vH -= perturb_one_up[np.newaxis,:]+perturb_one_up[:,np.newaxis]+perturb_one_down[np.newaxis,:]+perturb_one_down[:,np.newaxis]
+    vH =  vH/2
+    np.fill_diagonal(a = vH, val = perturb_one_up - 2*reference_potential + perturb_one_down)
+    vH =  vH/diff**2
+    return vH
+
+'''
+import matplotlib.pyplot as plt
+fig,ax=plt.subplots(nrows=2)
+ax[0].plot(H.flatten())
+ax[0].set(title='Analytical')
+ax[1].plot(vH.flatten())
+#ax[1].set(title=f'Numerical, Runtime {runtime:.2f} s')
+plt.show()
+
+errors = H-vH
+fig, ax = plt.subplots(ncols=2)
+errors = ax[0].imshow(errors)
+ax[0].set(title='Errors')
+fig.colorbar(errors)
+actualH = ax[1].imshow(H - np.diag(np.diag(H)))
+ax[1].set(title='True H without diagonal')
+fig.colorbar(actualH)
+plt.show()
+'''
