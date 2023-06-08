@@ -78,8 +78,8 @@ def numerical_hessian(coordinates, func, diff=0.01):
         1) OFFDIAGONALS
             To approximate the value on the OFFDIAGONALS such as the example I used above:
             
-            d''V      V(X1,Y1+DIFF,X2+DIFF,Y2) + V(X1,Y1-DIFF,X2-DIFF,Y2) + 2*V(X1,Y1,X2,Y2) - V(X1,Y1+DIFF,X2,Y2) - V(X1,Y1,X2+DIFF,Y2)
-            -----  = -------------------------------------------------------------------------------------------------------------------
+            d''V      V(X1,Y1+DIFF,X2+DIFF,Y2) + V(X1,Y1-DIFF,X2-DIFF,Y2) + 2*V(X1,Y1,X2,Y2) - V(X1,Y1+DIFF,X2,Y2) - V(X1,Y1,X2+DIFF,Y2)- V(X1,Y1-DIFF,X2,Y2) - V(X1,Y1,X2-DIFF,Y2)
+            -----  = --------------------------------------------------------------------------------------------------------------------------------------------------------------
             dY1X2                                      2*DIFF^2
             
             where DIFF represents the perturbation magnitude (also called epsilon)
@@ -89,11 +89,11 @@ def numerical_hessian(coordinates, func, diff=0.01):
             I refer to Y1 as the "row". Y is the "row dimension". Atom 1 is the "row atom". 
             I refer to X2 as the "column". X is the "column dimension".  Atom 2 is the "column atom". 
 
-            perturb_both_up[row,column] + perturb_both_down[row,column] + 2*reference - perturb_one_up[row] - perturb_one_up[column]
-            ------------------------------------------------------------------------------------------------------------------------
+            perturb_both_up[row,column] + perturb_both_down[row,column] + 2*reference - perturb_one_up[row] - perturb_one_up[column] - perturb_one_down[row] - perturb_one_down[row]
+            ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
                                                             2*DIFF^2
 
-            where reference just means the original x1,y1,x2,y2 without any perturbations
+            where reference just means the original potential of x1,y1,x2,y2 without any perturbations
         
         2) DIAGONALS
             To approximate the value on the DIAGONALS such as another example:
@@ -114,11 +114,12 @@ def numerical_hessian(coordinates, func, diff=0.01):
     natoms, ndims = coordinates.shape
     reference_potential = func(coordinates)
     H = np.zeros(shape=(natoms*ndims,natoms*ndims))
-    potentials = {'x+h,y': np.zeros(shape=(natoms,ndims)),
-                  'x-h,y': np.zeros(shape=(natoms,ndims)),
-                  'x+h,y+k':np.zeros(shape=(natoms*ndims, natoms*ndims)), 
-                  'x-h,y-k':np.zeros(shape=(natoms*ndims, natoms*ndims)),
-                 }
+
+    perturb_one_up   = np.zeros(shape=(natoms*ndims))
+    perturb_one_down = np.zeros(shape=(natoms*ndims))
+    perturb_both_up  = np.zeros(shape=(natoms*ndims, natoms*ndims))
+    perturb_both_down= np.zeros(shape=(natoms*ndims, natoms*ndims))
+
     column_perturb = np.zeros(shape=(natoms,ndims))
     row_perturb    = np.zeros(shape=(natoms,ndims))
     for column in range(natoms*ndims):
@@ -126,19 +127,19 @@ def numerical_hessian(coordinates, func, diff=0.01):
         column_dimension = column%ndims
         column_perturb[:,:] = 0
         column_perturb[column_atom,column_dimension] = diff
-        potentials['x+h,y'][column_atom,column_dimension] = func(coordinates+column_perturb)
-        potentials['x-h,y'][column_atom,column_dimension] = func(coordinates-column_perturb)
-        H[column,column]=potentials['x+h,y'][column_atom,column_dimension]-2*reference_potential+potentials['x-h,y'][column_atom,column_dimension]
+        perturb_one_up[column] = func(coordinates+column_perturb)
+        perturb_one_down[column] = func(coordinates-column_perturb)
+        H[column,column]=perturb_one_up[column]-2*reference_potential+perturb_one_down[column]
         H[column,column]=H[column,column]/(diff**2)
         for row in range(column):
             row_atom = row//ndims
             row_dimension = row%ndims
             row_perturb[:,:] = 0
             row_perturb[row_atom,row_dimension] = diff
-            potentials['x+h,y+k'][row,column] = func(coordinates + column_perturb + row_perturb)
-            potentials['x-h,y-k'][row,column] = func(coordinates - column_perturb - row_perturb)
-            numerator=potentials['x+h,y+k'][row,column]-potentials['x+h,y'][column_atom,column_dimension]-potentials['x+h,y'][row_atom,row_dimension]
-            numerator+=2*reference_potential-potentials['x-h,y'][column_atom,column_dimension]-potentials['x-h,y'][row_atom,row_dimension]
-            numerator+=potentials['x-h,y-k'][row,column]
+            perturb_both_up[row,column] = func(coordinates + column_perturb + row_perturb)
+            perturb_both_down[row,column] = func(coordinates - column_perturb - row_perturb)
+            numerator=perturb_both_up[row,column]-perturb_one_up[column]-perturb_one_up[row]
+            numerator+=2*reference_potential-perturb_one_down[column]-perturb_one_down[row]
+            numerator+=perturb_both_down[row,column]
             H[column,row]=H[row,column]=numerator/(2*diff**2)
     return H
