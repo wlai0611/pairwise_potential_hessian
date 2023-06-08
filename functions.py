@@ -43,6 +43,74 @@ def analytical_hessian(coordinates):
 
 
 def numerical_hessian(coordinates, func, diff=0.01):
+    '''
+    ILLUSTRATION:  This is what the function returns for a two atom 2D system
+    where X2 means X coordinate of atom 2.  V means the sum of the potential
+    energy for all the atom pairs.
+                         X1     |     Y1        |     X2   |   Y2   |
+    ------------------------------------------------------------------
+              |        d''V     |    d''V       |   d''V   |  d''V     
+            X1|   ------------  |   -------     |  ------  | ------
+              |       dX1X1     |    dX1Y1      |   dX1X2  |  dX1Y2
+    ------------------------------------------------------------------- 
+              |        d''V     |    d''V       |   d''V   |  d''V
+            Y1|   ------------- |   -------     |   ----   |  ----
+              |       dY1X1     |    dY1Y1      |   dY1X2  |  dY1Y2
+    -------------------------------------------------------------------
+              |      d''V       |   d''V        |   d''V   |  d''V
+            X2|     ------      |  -------      |  ------  |  -----
+              |      dX2X1      |   dX2Y1       |   dX2X2  |  dX2Y2
+    ------------------------------------------------------------------
+              |      d''V       |   d''V        |   d''V   |  d''V
+            Y2|      -----      |   -----       |   -----  |  ----
+              |      dY2X1      |   dY2Y1       |   dY2X2  |  dY2Y2
+
+    I)  NOTATION
+        d''V
+        ----
+        dY1X2   means the second partial derivative of V (sum of potentials) with respect to 
+        the Y coordinate of atom 1 and the X coordinate of atom 2
+
+        In a 2D, two atom example, V is a function of X1, Y1, X2, Y2: 
+        V(X1,Y1,X2,Y2)
+
+    II) CALCULATIONS
+        1) OFFDIAGONALS
+            To approximate the value on the OFFDIAGONALS such as the example I used above:
+            
+            d''V      V(X1,Y1+DIFF,X2+DIFF,Y2) + V(X1,Y1-DIFF,X2-DIFF,Y2) + 2*V(X1,Y1,X2,Y2) - V(X1,Y1+DIFF,X2,Y2) - V(X1,Y1,X2+DIFF,Y2)
+            -----  = -------------------------------------------------------------------------------------------------------------------
+            dY1X2                                      2*DIFF^2
+            
+            where DIFF represents the perturbation magnitude (also called epsilon)
+
+        1a) A NOTE ON VARIABLE NAMES
+            In the computer code:
+            I refer to Y1 as the "row". Y is the "row dimension". Atom 1 is the "row atom". 
+            I refer to X2 as the "column". X is the "column dimension".  Atom 2 is the "column atom". 
+
+            perturb_both_up[row,column] + perturb_both_down[row,column] + 2*reference - perturb_one_up[row] - perturb_one_up[column]
+            ------------------------------------------------------------------------------------------------------------------------
+                                                            2*DIFF^2
+
+            where reference just means the original x1,y1,x2,y2 without any perturbations
+        
+        2) DIAGONALS
+            To approximate the value on the DIAGONALS such as another example:
+            d''V      V(X1,Y1+DIFF,X2,Y2) - 2*V(X1,Y1,X2,Y2) + V(X1,Y1,X2+DIFF,Y2)
+            -----  =  ------------------------------------------------------------
+            dY1Y1                    DIFF^2
+
+        2a) ANOTHER NOTE ON VARIABLE NAMES
+            In the computer code:
+            I refer to Y1 as the "row".  The above formula is represented:
+
+            d''V    perturb_one_up[row] - 2*reference + perturb_one_down[column]
+            ----- = ------------------------------------------------------------   
+            dY1Y1                          DIFF^2
+           
+        
+    '''
     natoms, ndims = coordinates.shape
     reference_potential = func(coordinates)
     H = np.zeros(shape=(natoms*ndims,natoms*ndims))
