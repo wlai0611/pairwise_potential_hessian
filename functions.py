@@ -122,24 +122,28 @@ def numerical_hessian(coordinates, func, diff=0.01):
 
     column_perturb = np.zeros(shape=(natoms,ndims))
     row_perturb    = np.zeros(shape=(natoms,ndims))
+
     for column in range(natoms*ndims):
-        column_atom = column//ndims
-        column_dimension = column%ndims
+        column_atom      = column // ndims
+        column_dimension = column % ndims
         column_perturb[:,:] = 0
         column_perturb[column_atom,column_dimension] = diff
-        perturb_one_up[column] = func(coordinates+column_perturb)
-        perturb_one_down[column] = func(coordinates-column_perturb)
-        H[column,column]=perturb_one_up[column]-2*reference_potential+perturb_one_down[column]
-        H[column,column]=H[column,column]/(diff**2)
+        perturb_one_up[column]   = func(coordinates + column_perturb)
+        perturb_one_down[column] = func(coordinates - column_perturb)
+
+        H[column,column] = perturb_one_up[column] - 2*reference_potential + perturb_one_down[column]
+        H[column,column] = H[column,column]/(diff**2)
+
         for row in range(column):
-            row_atom = row//ndims
+            row_atom      = row//ndims
             row_dimension = row%ndims
             row_perturb[:,:] = 0
             row_perturb[row_atom,row_dimension] = diff
-            perturb_both_up[row,column] = func(coordinates + column_perturb + row_perturb)
+            perturb_both_up[row,column]   = func(coordinates + column_perturb + row_perturb)
             perturb_both_down[row,column] = func(coordinates - column_perturb - row_perturb)
-            numerator=perturb_both_up[row,column]-perturb_one_up[column]-perturb_one_up[row]
-            numerator+=2*reference_potential-perturb_one_down[column]-perturb_one_down[row]
-            numerator+=perturb_both_down[row,column]
-            H[column,row]=H[row,column]=numerator/(2*diff**2)
+
+            numerator =  perturb_both_up[row,column] + perturb_both_down[row,column] + 2*reference_potential
+            numerator -= perturb_one_up[column] + perturb_one_up[row] + perturb_one_down[column] + perturb_one_down[row]
+            H[column,row] = H[row,column] = numerator/(2*diff**2)
+
     return H
