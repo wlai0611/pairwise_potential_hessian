@@ -42,7 +42,7 @@ def add_all_interatomic_potentials(coordinates):
 #Evaluate Performance of Numerical Hessian
 trueH = functions.analytical_hessian(cluster)
 start = time.time()
-myH   = functions.numerical_hessian(coordinates=cluster,func=add_all_interatomic_potentials,diff=0.01)
+myH   = functions.forward_diff_hessian(coordinates=cluster,func=add_all_interatomic_potentials,diff=0.01)
 runtime = time.time()-start
 
 fig,ax=plt.subplots(nrows=2)
@@ -60,6 +60,15 @@ fig.colorbar(errors)
 actualH = ax[1].imshow(trueH - np.diag(np.diag(trueH)))
 ax[1].set(title='True H without diagonal')
 fig.colorbar(actualH)
+plt.show()
+
+fig, ax = plt.subplots(ncols=2)
+analytical = ax[0].imshow(trueH - np.diag(np.diag(trueH)))
+ax[0].set(title='True H without diagonal')
+fig.colorbar(analytical)
+numerical  = ax[1].imshow(myH - np.diag(np.diag(myH)))
+ax[1].set(title='Numerical H without diagonal')
+fig.colorbar(numerical)
 plt.show()
 
 print()

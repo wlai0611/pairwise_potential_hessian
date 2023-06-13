@@ -150,3 +150,44 @@ def numerical_hessian(coordinates, func, diff=0.01):
         column_perturb[column_atom,column_dimension] = 0
 
     return H
+
+def forward_diff_hessian(coordinates, func, diff=0.01):
+    natoms, ndims = coordinates.shape
+    reference_potential = func(coordinates)
+    H = np.zeros(shape=(natoms*ndims,natoms*ndims))
+
+    perturb_one_up   = np.zeros(shape=(natoms*ndims))
+    perturb_one_down = np.zeros(shape=(natoms*ndims))
+    perturb_both_up  = np.zeros(shape=(natoms*ndims, natoms*ndims))
+    perturb_both_down= np.zeros(shape=(natoms*ndims, natoms*ndims))
+
+    column_perturb = np.zeros(shape=(natoms,ndims))
+    row_perturb    = np.zeros(shape=(natoms,ndims))
+
+    for column in range(natoms*ndims):
+        column_atom      = column // ndims
+        column_dimension = column % ndims
+        
+        column_perturb[column_atom,column_dimension] = diff
+        perturb_one_up[column]   = func(coordinates + column_perturb)
+        perturb_one_down[column] = func(coordinates - column_perturb)
+
+        H[column,column] = perturb_one_up[column] - 2*reference_potential + perturb_one_down[column]
+        H[column,column] = H[column,column]/(diff**2)
+
+        for row in range(column):
+            row_atom      = row//ndims
+            row_dimension = row%ndims
+            
+            row_perturb[row_atom,row_dimension] = diff
+            perturb_both_up[row,column]   = func(coordinates + column_perturb + row_perturb)
+            
+            row_perturb[row_atom,row_dimension] = 0
+
+            numerator =  perturb_both_up[row,column] + reference_potential
+            numerator -= perturb_one_up[column] + perturb_one_up[row]
+            H[column,row] = H[row,column] = numerator/(diff**2)
+
+        column_perturb[column_atom,column_dimension] = 0
+
+    return H
